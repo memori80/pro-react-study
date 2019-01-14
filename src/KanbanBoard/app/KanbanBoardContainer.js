@@ -7,7 +7,7 @@ import {throttle} from './utils';
 const API_URL = 'http://kanbanapi.pro-react.com'
 const API_HEADERS = {
 	'Content-Type': 'application/json',
-	'Authorization': 'any-string-you-like123'
+	'Authorization': 'any-string-you-like'
 };
 
 class KanbanBoardContainer extends Component {

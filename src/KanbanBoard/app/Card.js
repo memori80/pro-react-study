@@ -42,7 +42,7 @@ let collectDrag = (connect, monitor) => {
 
 let collectDrop = (connect, monitor) => {
 	return {
-		connectDropTarget: connect.DropTarget()
+		connectDropTarget: connect.dropTarget()
 	};
 }
 class Card extends Component {
