@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import { timingSafeEqual } from 'crypto';
 import { DragSource, DropTarget } from 'react-dnd';
 import constants from './constants';
+import {Link} from 'react-router';
 
 
 let titlePropType = (props, propName, componentName) => {
@@ -85,6 +86,9 @@ f
 		return connectDropTarget(connectDragSource(
 			<div className="card">
 				<div style={sideColor} />
+				<div className="card__edit">
+					<Link to={'/edit/'+this.props.id}>&#9998;</Link>
+				</div>
 				<div className={
 					this.state.showDetails ? "card__title card__title--is-open" : "card__title"
 					} onClick={this.toggleDetails.bind(this)}>
