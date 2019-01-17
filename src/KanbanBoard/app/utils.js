@@ -1,9 +1,11 @@
+import "babel-polyfill";
+
 export const throttle = (func, wait) => {
     let context, args, prevArgs, argsChanged, result;
     let previous = 0;
-    return function(){
+    return function() {
         let now, remaining;
-        if(wait){
+        if (wait) {
             now = Date.now();
             remaining = wait - (now - previous);
         }
@@ -11,8 +13,8 @@ export const throttle = (func, wait) => {
         args = arguments;
         argsChanged = JSON.stringify(args) != JSON.stringify(prevArgs);
         prevArgs = Object.assign({}, args);
-        if(argsChanged || wait && (remaining <= 0 || remaining > wait)){
-            if(wait){
+        if (argsChanged || (wait && (remaining <= 0 || remaining > wait))) {
+            if (wait) {
                 previous = now;
             }
             result = func.apply(context, args);

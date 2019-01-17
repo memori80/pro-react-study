@@ -1,236 +1,293 @@
-import React, {Component} from 'react';
-import KanbanBoard from './KanbanBoard';
-import 'whatwg-fetch';
-import update from 'immutability-helper';
-import {throttle} from './utils';
+import React, { Component, PropTypes } from "react";
+import update from "react-addons-update";
+import { throttle } from "./utils";
+import KanbanBoard from "./KanbanBoard";
+import "babel-polyfill";
+import "whatwg-fetch";
 
-const API_URL = 'http://kanbanapi.pro-react.com'
+const API_URL = "http://kanbanapi.pro-react.com";
 const API_HEADERS = {
-	'Content-Type': 'application/json',
-	'Authorization': 'any-string-you-like'
+    "Content-Type": "application/json",
+    Authorization: "jickoo-kanban-board"
 };
 
 class KanbanBoardContainer extends Component {
-	constructor(){
-		super(...arguments);
-		this.state = {
-			cards: [],
-		};
-	}
+    constructor() {
+        super(...arguments);
+        this.state = {
+            cards: []
+        };
 
-	componentDidMount() {
-		fetch(API_URL + '/cards', {headers: API_HEADERS})
-		.then((response) => response.json())
-		.then((responseData) => {
-			this.setState({
-				cards: responseData
-			});
-		})
-		.catch((error) => {
-			console.log('Error fetching and parsingdata', error);
+        this.updateCardStatus = throttle(this.updateCardStatus.bind(this));
+        this.updateCardPosition = throttle(
+            this.updateCardPosition.bind(this),
+            500
+        );
+    }
 
-		})
-	}
+    componentDidMount() {
+        fetch(API_URL + "/cards", { headers: API_HEADERS })
+            .then(response => response.json())
+            .then(responseData => {
+                this.setState({ cards: responseData });
 
-	addCard(card){
-		let prevState = this.state;
+                window.state = this.state;
+            })
+            .catch(error => {
+                console.log("Error", error);
+            });
+    }
 
-		if(card.id === null){
-			let card = Object.assign({}, card, {id:Date.now()});
-		}
+    addTask(cardId, taskName) {
+        let prevState = this.state;
 
-		let nextState = update(this.state.cards, {
-			$push: [card]
-		});
+        let cardIndex = this.state.cards.findIndex(card => card.id == cardId);
 
-		this.setState({cards:nextState});
+        let newTask = { id: Date.now(), name: taskName, done: false };
 
-		fetch(`${API_URL}/cards`, {
-			method: 'post',
-			headers: API_HEADERS,
-			body: JSON.stringify(card)
-		})
-		.then((response)=>{
-			if(response.ok){
-				return response.json()
-			}else{
-				throw new Error("Server response wasn't OK");
-			}
-		})
-		.then((responseData)=>{
-			card.id=responseData.id;
-			this.setState({cards:nextState});
-		})
-		.catch((error)=>{
-			this.setState(prevState);
-		})
-	}
+        let nextState = update(this.state.cards, {
+            [cardIndex]: {
+                tasks: { $push: [newTask] }
+            }
+        });
 
-	updateCard(card){
-		let prevState = prevState;
+        this.setState({ cards: nextState });
 
-		let cardIndex = this.state.cards.findIndex((c)=>c.id == card.id);
+        fetch(`${API_URL}/cards/${cardId}/tasks`, {
+            method: "post",
+            headers: API_HEADERS,
+            body: JSON.stringify(newTask)
+        })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error("server response wasn't OK");
+                }
+            })
+            .then(responseData => {
+                newTask.id = responseData.id;
+                this.setState({ cards: nextState });
+            })
+            .catch(error => {
+                this.setState(prevState);
+            });
+    }
 
-		let nextState = update(
-			this.state.cards, {
-				[cardIndex]: {$set: card}
-			}
-		);
+    deleteTask(cardId, taskId, taskIndex) {
+        let cardIndex = this.state.cards.findIndex(card => card.id == cardId);
 
-		this.setState({
-			cards:nextState
-		});
+        let prevState = this.state;
 
-		fetch(`$API_URL/cards/${card.id}`, {
-			method: 'put',
-			headers: API_HEADERS,
-			body: JSON.stringify(card)
-		})
-		.then((response)=> {
-			if(!response.ok){
-				throw new Error("Server response wasn't OK")
-			}
-		})
-		.catch((error)=>{
-			console.error("Fetch error:", error);
-			this.setState(prevState);
-		})
-	}
+        let nextState = update(this.state.cards, {
+            [cardIndex]: {
+                tasks: { $splice: [[taskIndex, 1]] }
+            }
+        });
 
-	addTask(cardId, taskName){
-		let cardIndex = this.state.cards.findIndex((card)=>card.id == cardId);
+        this.setState({ cards: nextState });
 
-		let newTask = {
-			id: Date.now(),
-			name: taskName,
-			done: false
-		};
+        fetch(`${API_URL}/cards/${cardId}/tasks/${taskId}`, {
+            method: "delete",
+            headers: API_HEADERS
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Server response wasn't OK");
+                }
+            })
+            .catch(error => {
+                console.log("fetch error: ", error);
+                this.setState(prevState);
+            });
+    }
 
-		let nextState = update(this.state.cards, {
-			[cardIndex]: {
-				tasks: {$push: [newTask]}
-			}
-		});
+    toggleTask(cardId, taskId, taskIndex) {
+        let prevState = this.state;
 
-		this.setState({
-			cards: nextState
-		});
+        let cardIndex = this.state.cards.findIndex(card => card.id == cardId);
 
-		this.updateCardStatus = throttle(this.updateCardStatus.bind(this));
-		this.updateCardPosition = throttle(this.updateCardPosition.bind(this), 500);
+        let newDoneValue;
 
-		fetch(`${API_URL}/cards/${cardId}/tasks`, {
-			method: 'post',
-			headers: API_HEADERS,
-			body: JSON.stringify(newTask)
-		})
-		.then((response)=>response.json())
-		.then((responseData)=>{
-			newTask.id = responseData.id
-			this.setState({cards: nextState});
-		})
+        let nextState = update(this.state.cards, {
+            [cardIndex]: {
+                tasks: {
+                    [taskIndex]: {
+                        done: {
+                            $apply: done => {
+                                newDoneValue = !done;
+                                return newDoneValue;
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
-	}
+        this.setState({ cards: nextState });
 
-	deleteTask(cardId, taskId, taskIndex){
-		let cardIndex = this.state.cards.findIndex((card)=>card.id == cardId);
+        fetch(`${API_URL}/cards/${cardId}/tasks/${taskId}`, {
+            method: "put",
+            headers: API_HEADERS,
+            body: JSON.stringify({ done: newDoneValue })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Server error");
+                }
+            })
+            .catch(error => {
+                console.log("Fetch error : " + error);
+                this.setState(prevState);
+            });
+    }
 
-		let nextState = update(this.state.cards, {
-			[cardIndex]: {
-				tasks: {$splice: [[taskIndex, 1]]}
-			}
-		});
+    updateCardStatus(cardId, listId) {
+        let cardIndex = this.state.cards.findIndex(card => card.id == cardId);
+        let card = this.state.cards[cardIndex];
+        if (card.status !== listId) {
+            this.setState(
+                update(this.state, {
+                    cards: {
+                        [cardIndex]: {
+                            status: { $set: listId }
+                        }
+                    }
+                })
+            );
+        }
+    }
 
-		this.setState({
-			cards: nextState
-		});
+    updateCardPosition(cardId, afterId) {
+        if (cardId !== afterId) {
+            let cardIndex = this.state.cards.findIndex(
+                card => card.id == cardId
+            );
+            let card = this.state.cards[cardIndex];
+            let afterIndex = this.state.cards.findIndex(
+                card => card.id == afterId
+            );
+            this.setState(
+                update(this.state, {
+                    cards: {
+                        $splice: [[cardIndex, 1], [afterIndex, 0, card]]
+                    }
+                })
+            );
+        }
+    }
 
-		fetch(`${API_URL}/cards/${cardId}/tasks/${taskId}`, {
-			method: 'delete',
-			headers: API_HEADERS
-		});
-	}
+    persistCardDrag(cardId, status) {
+        let cardIndex = this.state.cards.findIndex(card => card.id == cardId);
+        let card = this.state.cards[cardIndex];
 
-	toggleTask(cardId, taskId, taskIndex){
-		let cardIndex = this.state.cards.findIndex((card)=>card.id == cardId);
+        fetch(`${API_URL}/cards/${cardId}`, {
+            method: "put",
+            headers: API_HEADERS,
+            body: JSON.stringify({
+                status: card.status,
+                row_order_position: cardIndex
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Server response wasn't OK");
+                }
+            })
+            .catch(error => {
+                console.error("Fetch error:", error);
+                this.setState(
+                    update(this.state, {
+                        cards: {
+                            [cardIndex]: {
+                                status: { $set: status }
+                            }
+                        }
+                    })
+                );
+            });
+    }
 
-		let newDoneValue;
+    addCard(card) {
+        let prevState = this.state;
 
-		let nextState = update(this.state.cards, {
-			[cardIndex]: {
-				tasks: {
-					[taskIndex]: {
-						done: {
-							$apply: (done)=>{
-								newDoneValue = !done;
-								return newDoneValue;
-							}
-						}
-					}
-				}
-			}
-		});
+        if (card.id === null) {
+            let card = Object.assign({}, card, { id: Date.now() });
+        }
 
-		this.setState({
-			cards: nextState
-		});
+        let nextState = update(this.state.cards, { $push: [card] });
 
-		fetch(`${API_URL}/cards/${cardId}/tasks/${taskId}`, {
-			method: 'put',
-			headers: API_HEADERS,
-			body: JSON.stringify({done:newDoneValue})
-		});
-	}
+        this.setState({ cards: nextState });
 
-	updateCardStatus(cardId, listId) {
-		let cardIndex = this.state.cards.findIndex((card)=>card.id == cardId);
-		let card = this.state.cards[cardIndex];
-		if(card.status !== listId){
-			this.setState(update(this.state, {
-				cards: {
-					[cardIndex]: {
-						status: {$set: listId}
-					}
-				}
-			}));
-		}
-	}
+        fetch(`${API_URL}/cards`, {
+            method: "post",
+            headers: API_HEADERS,
+            body: JSON.stringify(card)
+        })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error("Server response wasn't OK");
+                }
+            })
+            .then(responseData => {
+                card.id = responseData.id;
+                this.setState({ cards: nextState });
+            })
+            .catch(error => {
+                this.setState(prevState);
+            });
+    }
 
-	updateCardPosition(cardId, afterId){
-		if(cardId !== afterId){
-			let cardIndex = this.state.cards.findIndex((card)=>card.id == cardId);
-			let card = this.state.cards[cardIndex];
-			let afterIndex = this.state.cards.findIndex((card)=>card.id == afterId);
-			this.setState(update(this.state, {
-				cards: {
-					$splice: [
-						[cardIndex, 1],
-						[afterIndex, 0, card]
-					]
-				}
-			}));
-		}
-	}
+    updateCard(card) {
+        let prevState = this.state;
 
-	render() {
-		let kanbanBoard = this.props.children && React.cloneElement(this.props.children, {
-			cards: this.state.cards,
-			taskCallbacks: {
-				toggle: this.toggleTask.bind(this),
-				delete: this.deleteTask.bind(this),
-				add: this.addTask.bind(this)
-			},
-			cardCallbacks: {
-				addCard: this.addCard.bind(this),
-				updateCard: this.updateCard.bind(this),
-				updateStatus: this.updateCardStatus.bind(this),
-				updatePosition: this.updateCardPosition.bind(this),
-				persistMove: this.persistCardMove.bind(thid)
-			}
-		});
+        let cardIndex = this.state.cards.findIndex(c => c.id == card.id);
 
-		return kanbanBoard;
-	}
-};
+        let nextState = update(this.state.cards, {
+            [cardIndex]: { $set: card }
+        });
+
+        this.setState({ cards: nextState });
+
+        fetch(`${API_URL}/cards/${card.id}`, {
+            method: "put",
+            headers: API_HEADERS,
+            body: JSON.stringify(card)
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Server response wasn't ok");
+                }
+            })
+            .catch(e => {
+                console.error("Fetch error: ", e);
+                this.setState(prevState);
+            });
+    }
+
+    render() {
+        let kanbanBoard =
+            this.props.children &&
+            React.cloneElement(this.props.children, {
+                cards: this.state.cards,
+                taskCallbacks: {
+                    toggle: this.toggleTask.bind(this),
+                    delete: this.deleteTask.bind(this),
+                    add: this.addTask.bind(this)
+                },
+                cardCallbacks: {
+                    addCard: this.addCard.bind(this),
+                    updateCard: this.updateCard.bind(this),
+                    updateStatus: this.updateCardStatus,
+                    updatePosition: this.updateCardPosition,
+                    persistCardDrag: this.persistCardDrag.bind(this)
+                }
+            });
+
+        return kanbanBoard;
+    }
+}
 
 export default KanbanBoardContainer;
